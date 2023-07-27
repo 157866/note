@@ -1,0 +1,672 @@
+## Git
+
+是一个免费的开源的分布式版本控制系统，
+
+
+
+### 1.1何为版本控制
+
+​					版本控制是一种记录文件内容变化，以便将来查阅特定版本修订情况的系统。
+
+​					版本控制其实最重要的是可以记录文件修改历史记录，从而让用户能够查看历史版本。
+
+
+
+### 1.2为什么需要版本控制
+
+个人开发过度到团队合作
+
+
+
+
+
+### 1.3版本控制工具
+
+> 集中式版本控制  CVS  SVN
+
+版本库是集中存放在中央服务器的，而干活的时候，用的都是自己的电脑，所以要先从中央服务器取得最新的版本，然后开始干活，干完活了，再把自己的活推送给中央服务器。中央服务器就好比是一个图书馆，你要改一本书，必须先从图书馆借出来，然后回到家自己改，改完了，再放回图书馆。
+
+
+
+![img](https://pic3.zhimg.com/80/v2-9d93db6c1c5f4782d9f4c9365ea54afa_720w.webp)
+
+
+
+集中式版本控制系统最大的缺点就是必须联网才能工作，如果在局域网内还好，带宽够大，速度够快，可如果在互联网上，遇到网速慢的话，可能提交一个10M的文件就需要5分钟。
+
+
+
+> 分布式版本控制  Git 
+
+首先，分布式版本控制系统根本没有“中央服务器”，每个人的电脑上都是一个完整的版本库，这样，你工作的时候，就不需要联网了，因为版本库就在你自己的电脑上。既然每个人电脑上都有一个完整的版本库，那多个人如何协作呢？比方说你在自己电脑上改了文件A，你的同事也在他的电脑上改了文件A，这时，你们俩之间只需把各自的修改推送给对方，就可以互相看到对方的修改了。
+
+和集中式版本控制系统相比，分布式版本控制系统的安全性要高很多，因为每个人电脑里都有完整的版本库，某一个人的电脑坏掉了不要紧，随便从其他人那里复制一个就可以了。而集中式版本控制系统的中央服务器要是出了问题，所有人都没法干活了。
+
+在实际使用分布式版本控制系统的时候，其实很少在两人之间的电脑上推送版本库的修改，因为可能你们俩不在一个局域网内，两台电脑互相访问不了，也可能今天你的同事病了，他的电脑压根没有开机。因此，分布式版本控制系统通常也有一台充当“中央服务器”的电脑，但这个服务器的作用仅仅是用来方便“交换”大家的修改，没有它大家也一样干活，只是交换修改不方便而已。
+
+
+
+![img](https://pic3.zhimg.com/80/v2-47af0c90eebd830fc1e2dae21f33cc76_720w.webp)
+
+
+
+### 1.4git和代码托管中心
+
+代码托管中心是基于网络服务器的远程代码仓库，一般称为**远程库**
+
+> 局域网
+
+GitLab
+
+> 互联网
+
+GitHub（外网）
+
+Gitee 码云（国内网站）
+
+
+
+### 2.0 git常规指令
+
+
+
+|               指令名称                |      作用      |
+| :-----------------------------------: | :------------: |
+| git config --global user.name  用户名 |  设置用户签名  |
+|  git config --global user.email 邮箱  |  设置用户签名  |
+|               git init                |  初始化本地库  |
+|              git status               | 查看本地库状态 |
+|           git add 文件名称            |  添加到缓冲区  |
+|   git commit -m "日志信息"  文件名    |  提交到本地库  |
+|              git reflog               |  查看历史记录  |
+|        git rest --hard 版本号         |    版本穿梭    |
+|                 clear                 |    清空页面    |
+
+说明：首次使用git的时候要设置用户签名，否则无法提交代码，用户签名跟GitHub的或者其他托管代码中心的账号没有任何关系
+
+
+
+
+
+### 2.1 git基本语法
+
+#### **git init**
+
+```
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo
+$ git init
+Initialized empty Git repository in C:/Users/wmt/Desktop/git-demo/.git/
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ ll
+total 0
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ ll -a
+total 20
+drwxr-xr-x 1 wmt 197121 0 Jan 11 13:53 ./
+drwxr-xr-x 1 wmt 197121 0 Jan 11 13:52 ../
+drwxr-xr-x 1 wmt 197121 0 Jan 11 13:53 .git/
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$
+
+```
+
+​	ll无法查看隐藏文件
+
+​	ll -a可以查看隐藏文件
+
+
+
+
+
+#### git status
+
+
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git status
+On branch master
+
+No commits yet
+
+nothing to commit (create/copy files and use "git add" to track)
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$
+
+```
+
+
+
+#### vim创建文件
+
+ i进入编辑模式   esc退出编辑模式   ：wq保存
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ vim hello.txt
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ cat hello.txt
+hello git two
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        hello.txt
+        hellow.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+
+```
+
+
+
+####  git add hello.txt
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git add hello.txt
+warning: in the working copy of 'hello.txt', LF will be replaced by CRLF the next time Git touches it
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   hello.txt
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        hellow.txt
+
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$
+
+```
+
+
+
+#### git rm --cached 文件名
+
+> 去除
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git rm --cached hello.txt
+rm 'hello.txt'
+
+```
+
+
+
+#### git commit -m "描述版本"  文件名
+
+git commit -m "my frist commit" hello.txt
+
+	> 要提交先add
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git add hello.txt
+warning: in the working copy of 'hello.txt', LF will be replaced by CRLF the next time Git touches it
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git commit -m "my frist commit" hello.txt
+warning: in the working copy of 'hello.txt', LF will be replaced by CRLF the next time Git touches it
+[master (root-commit) f31f195] my frist commit
+ 1 file changed, 1 insertion(+)
+ create mode 100644 hello.txt
+
+```
+
+####  git reflog
+
+查看日志信息
+
+```
+$ git reflog
+03ad6c9 (HEAD -> master) HEAD@{0}: commit: my next commit
+f31f195 HEAD@{1}: commit (initial): my frist commit
+
+
+```
+
+#### git log
+
+比git reflog更详细
+
+```
+$ git log
+commit 03ad6c979802f867f0e13921670713e35fd0d971 (HEAD -> master)
+Author: wmt <2849569455@qq.com>
+Date:   Thu Jan 12 12:55:06 2023 +0800
+
+    my next commit
+
+commit f31f195fbc8ffb1c9febbb2504347e08898e067d
+Author: wmt <2849569455@qq.com>
+Date:   Thu Jan 12 12:49:54 2023 +0800
+
+    my frist commit
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$
+
+
+```
+
+
+
+#### 修改并提交
+
+
+
+```
+$ vim hello.txt
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git status
+On branch master
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   hello.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git add hello.txt
+warning: in the working copy of 'hello.txt', LF will be replaced by CRLF the next time Git touches it
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git status
+On branch master
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   hello.txt
+
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git commit -m "second commit" hello.txt
+warning: in the working copy of 'hello.txt', LF will be replaced by CRLF the next time Git touches it
+[master a519744] second commit
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+
+```
+
+
+
+### 2.2 版本穿梭
+
+####  git reset --hard f31f195
+
+> 先通过git reflog 来查看版本号通过 git reset --hard 版本号  来进行穿梭
+>
+> reset 调整
+>
+> head 指向
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git reflog
+03ad6c9 (HEAD -> master) HEAD@{0}: reset: moving to 03ad6c9
+a519744 HEAD@{1}: commit: second commit
+03ad6c9 (HEAD -> master) HEAD@{2}: commit: my next commit
+f31f195 HEAD@{3}: commit (initial): my frist commit
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git reset --hard f31f195
+HEAD is now at f31f195 my frist commit
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git reflog
+f31f195 (HEAD -> master) HEAD@{0}: reset: moving to f31f195
+03ad6c9 HEAD@{1}: reset: moving to 03ad6c9
+a519744 HEAD@{2}: commit: second commit
+03ad6c9 HEAD@{3}: commit: my next commit
+f31f195 (HEAD -> master) HEAD@{4}: commit (initial): my frist commit
+
+```
+
+
+
+### 2.3 分支的好处
+
+同时并行推进多个功能开发，提高开发效率
+
+各个分支在开发过程中，如果有一个分支开发失败也不会影响其他的分支，失败的分支删除重新开始即可
+
+
+
+|      命令名称       |            作用            |
+| :-----------------: | :------------------------: |
+|  git branch 分支名  |          创建分支          |
+|    git branch -v    |          查看分支          |
+| git checkout 分支名 |          切换分支          |
+|  git merge 分支名   | 指定的分支合并到当前分支上 |
+
+
+
+#### git branch -v
+
+> 查看分支
+
+```
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git branch -v
+* master a519744 second commit
+
+```
+
+
+
+#### git branch 分支名称
+
+> 创建hot-fix的分支
+>
+> git branch hot-fix
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git branch hot-fix
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git branch -v
+  hot-fix a519744 second commit
+* master  a519744 second commit
+
+```
+
+
+
+#### git checkout 分支名称
+
+> 切换分支
+>
+> git checkout hot-fix
+
+```
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git checkout hot-fix
+Switched to branch 'hot-fix'
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (hot-fix)
+
+```
+
+
+
+#### git merge hot-fix
+
+> 合并分支
+>
+> 在当前master分支 去合并hot-fix分支
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git merge hot-fix
+Updating a519744..fa9ea62
+Fast-forward
+ hello.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+```
+
+
+
+#### 合并冲突
+
+> 合并冲突产生的原因：
+>
+> ​		合并冲突时，两个分支在**同一文件的同一个位置**有两套完全不一样的修改，git无法决定需要人为决定新代码内容
+
+
+
+
+
+
+
+> <<<<<<< HEAD 表示当前分支
+>
+> ​		当前分支代码
+>
+> ======= 分割
+>
+> ​		合并分支的代码
+>
+> ->>>>>> 合并的分支
+
+打开的hello.txt文件夹
+
+```
+hello git two   1111111 test
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git
+<<<<<<< HEAD
+hello git master test
+hello git
+=======
+hello git
+hello git hot-fix test
+>>>>>>> hot-fix
+
+```
+
+
+
+1. 手动删除多余的代码
+
+```
+hello git two   1111111 test
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git master test
+hello git hot-fix test
+```
+
+2. 添加到本地占存区 git add hello.txt
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master|MERGING)
+$ git add hello.txt
+```
+
+3. 执行提交（注意：此时使用git commit**命令不能带文件名**）
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master|MERGING)
+$ git commit -m "merge hot-fix"
+[master db344b0] merge hot-fix
+---此时发现(master|MERGING)变成了(master)
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$
+
+```
+
+
+
+>  结果
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ cat hello.txt
+hello git two   1111111 test
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git
+hello git master tes
+hello git hot-fix test
+
+```
+
+
+
+
+
+### 3.0团队合作
+
+#### git remote -v
+
+> 查看别名
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git remote -v
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$
+```
+
+
+
+#### git remote add 别名  原名
+
+> 创建别名
+
+
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git remote add git-demo https://github.com/157866/git-demo.git
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git remote -v
+git-demo        https://github.com/157866/git-demo.git (fetch)
+git-demo        https://github.com/157866/git-demo.git (push)
+```
+
+
+
+#### git push 别名 分支
+
+> 第一次提交需要配置
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git config --global http.sslVerify false
+
+```
+
+
+
+```
+$ git push git-demo master
+warning: ----------------- SECURITY WARNING ----------------
+warning: | TLS certificate verification has been disabled! |
+warning: ---------------------------------------------------
+warning: HTTPS connections may not be secure. See https://aka.ms/gcm/tlsverify for more information.
+warning: ----------------- SECURITY WARNING ----------------
+warning: | TLS certificate verification has been disabled! |
+warning: ---------------------------------------------------
+warning: HTTPS connections may not be secure. See https://aka.ms/gcm/tlsverify for more information.
+warning: ----------------- SECURITY WARNING ----------------
+warning: | TLS certificate verification has been disabled! |
+warning: ---------------------------------------------------
+warning: HTTPS connections may not be secure. See https://aka.ms/gcm/tlsverify for more information.
+warning: ----------------- SECURITY WARNING ----------------
+warning: | TLS certificate verification has been disabled! |
+warning: ---------------------------------------------------
+warning: HTTPS connections may not be secure. See https://aka.ms/gcm/tlsverify for more information.
+Enumerating objects: 24, done.
+Counting objects: 100% (24/24), done.
+Delta compression using up to 12 threads
+Compressing objects: 100% (19/19), done.
+Writing objects: 100% (24/24), 1.98 KiB | 507.00 KiB/s, done.
+Total 24 (delta 3), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (3/3), done.
+To https://github.com/157866/git-demo.git
+ * [new branch]      master -> master
+
+
+```
+
+
+
+
+
+####  git pull 别名 分支
+
+> 从服务器拉去代码更新到本地库
+>
+> git pull git-demo master
+>
+> git pull 	别名 	 分支
+
+```
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-demo (master)
+$ git pull git-demo master
+From https://github.com/157866/git-demo
+ * branch            master     -> FETCH_HEAD
+Updating db344b0..c7b9619
+Fast-forward
+ hello.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+```
+
+
+
+#### git clone 链接
+
+> 公开项目克隆不需要登陆
+>
+> $ git clone https://github.com/157866/git-demo.git
+>
+> 小结： clone会做的操作   1. 拉取代码  2. 初始化本地库 3. 创建别名
+
+```
+
+wmt@DESKTOP-LP70K01 MINGW64 ~/Desktop/git-clone
+$ git clone https://github.com/157866/git-demo.git
+Cloning into 'git-demo'...
+remote: Enumerating objects: 27, done.
+remote: Counting objects: 100% (27/27), done.
+remote: Compressing objects: 100% (19/19), done.
+remote: Total 27 (delta 4), reused 23 (delta 3), pack-reused 0
+Receiving objects: 100% (27/27), done.
+Resolving deltas: 100% (4/4), done.
+
+```
+
+
+
+### 3.1 团队内合作
+
+项目 >> setting  >> collaborators  >> 添加合作
+
+![1674889541200](C:\Users\wmt\AppData\Roaming\Typora\typora-user-images\1674889541200.png)
+
