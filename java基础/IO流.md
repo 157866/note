@@ -288,15 +288,15 @@ File file = new File("C:\\Users\\34912\\Desktop\\图书·管理系统备份\\boo
 
 - 字节流 图片，视频，音频
 
-​ 字节输入流： InputSteam
+ 字节输入流： InputSteam
 
-​ 字节输出流; OutputSteam
+ 字节输出流; OutputSteam
 
 - 字符流 abc
 
-​ 字符输入流：Reader
+ 字符输入流：Reader
 
-​ 字符输出流：Writer
+ 字符输出流：Writer
 
 **不管是字节还是字符流，底层流动的都是字节流**
 
@@ -504,21 +504,21 @@ DataInputSteam 基本的数据类型输出到程序
 
 - 操作字节数组
 
-​ ByteArrayOutputSteam();
+ ByteArrayOutputSteam();
 
-​ ByteArrayInputSteam(byte[] buf);
+ ByteArrayInputSteam(byte[] buf);
 
 - 操作字符数组
 
-​ CharArrayWrite
+ CharArrayWrite
 
-​ CharArrayReader
+ CharArrayReader
 
 - 操作字符串
 
-​ String write
+ String write
 
-​ String Reader
+ String Reader
 
 字节内存流
 
@@ -574,11 +574,11 @@ DataInputSteam 基本的数据类型输出到程序
 
 - 字节打印流(pintSteam)
 
-​ 字节打印流继承了OutputSteam
+ 字节打印流继承了OutputSteam
 
 - 字符打印流(pinWriter)
 
-​ 字符打印流继承了writer
+ 字符打印流继承了writer
 
 
 
