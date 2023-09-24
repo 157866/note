@@ -1,5 +1,9 @@
 # Redis
 
+[TOC]
+
+
+
 前言：
 
 > 与传统数据关系（MySQL）
@@ -5212,7 +5216,7 @@ Redis客户端可以订阅任意数量的频道,类似我们微信关注多个�
 
 
 
-## redis复制（replica） 有问题
+## redis复制（replica）
 
 
 
@@ -5277,34 +5281,190 @@ Redis客户端可以订阅任意数量的频道,类似我们微信关注多个�
 
 
 
-> 因为内存原理不采用Linux里搭建redis集群 采用docker来搭建一主两从
+
+
+> 因为内存不够不采用Linux里搭建redis集群 采用docker来搭建一主两从
+
+redis_master.conf 文件内容
+
+```
+# 绑定
+bind 0.0.0.0
+# 连接保护模式关闭
+protected-mode no
+# 端口 可以去修改端口号 docker -p 中的端口没有关系 修改后 redis-cli 连接的时候 -p 要指定修改后的端口号 不写默认是6379
+port 6379
+# 数据库数量
+databases 16
+# rdb快照规则
+# 在900秒（15分钟）后，如果至少更改了1个键
+save 900 1
+save 300 10
+save 60 10000
+# rdb快照文件名称
+dbfilename dump.rdb
+# 客户端连接数量设置
+maxclients 10000
+# AOF模式开启，默认关闭
+appendonly ye
+# 文件名
+appendfilename "appendonly.aof"
+# AOF同步机制 
+# 每秒同步
+appendfsync everysec
+# 文件大小切割
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+# 淘汰机制设置
+maxmemory-policy noeviction
+
+#密码设置
+requirepass 123456
+
+```
+
+
+
+主机IP
+
+```
+[root@hadoop100 /]# docker inspect redis-master | grep IP
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "172.17.0.3",
+            "IPPrefixLen": 16,
+            "IPv6Gateway": "",
+                    "IPAMConfig": null,
+                    "IPAddress": "172.17.0.3",   #IP地址
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+```
+
+
+
+
+
+redis_slave.conf 文件内容，在主机的redis_master.conf的配置之上再加多下面的配置
+
+```
+# 修改从机的端口号
+port 对应的端口号就可以了
+# 主机地址
+replicaof 172.17.0.3 6400   // 主机IP地址 端口号
+masterauth 123456
+```
+
+目录结构
+
+```
+/myredis
+ 	/redis_master
+ 		/data
+ 		/conf
+ 			/各自的配置文件
+	/redis_slave1
+		/data
+		/conf
+			/各自的配置文件
+	/redis_slave2
+		/data
+		/conf
+			/各自的配置文件
+```
+
+
 
 
 
 #### 创建容器
 
+```
+# -v 容器卷
+# -d 后台启动
+
+
+# redis 主机启动
+docker run \
+--restart=always \
+--name redis-master \
+-v /myredis/redis_master/conf/redis_master.conf:/etc/redis/redis.conf \
+-v /myredis/redis_master/data:/data \
+-v /etc/localtime:/etc/localtime \
+-p 6400:6379 \
+-d 7614ae9453d1 redis-server /etc/redis/redis.conf
+
+
+#redis 从机启动
+docker run \
+--restart=always \
+--name redis-slave1 \
+-v /myredis/redis_slave1/conf/redis_slave1.conf:/etc/redis/redis.conf \
+-v /myredis/redis_slave1/data:/data \
+-v /etc/localtime:/etc/localtime \
+-p 6401:6379 \
+-d 7614ae9453d1 redis-server /etc/redis/redis.conf
+
+
+
+#redis 从机启动
+docker run \
+--restart=always \
+--name redis-slave2 \
+-v /myredis/redis_slave2/conf/redis_slave2.conf:/etc/redis/redis.conf \
+-v /myredis/redis_slave2/data:/data \
+-v /etc/localtime:/etc/localtime \
+-p 6402:6379 \
+-d 7614ae9453d1 redis-server /etc/redis/redis.conf
 
 
 ```
-#构建一主两从
-[root@hadoop100 myredis]#  docker run  -d --name redis-master --net host --privileged=true -v /myredis/redis_master/data:/data 7614ae9453d1 --cluster-enabled yes --appendonly yes --port 6
-400 
 
-[root@hadoop100 myredis]#  docker run  -d --name redis-slave1 --net host --privileged=true -v /myredis/redis_slave1/data:/data 7614ae9453d1 --cluster-enabled yes --appendonly yes --port 6401
 
-[root@hadoop100 myredis]#  docker run  -d --name redis-slave2 --net host --privileged=true -v /myredis/redis_slave2/data:/data 7614ae9453d1 --cluster-enabled yes --appendonly yes --port 6402
 
-#查看是否构建成功
-[root@hadoop100 myredis]# docker ps
-CONTAINER ID   IMAGE          COMMAND                   CREATED              STATUS              PORTS                                                     NAMES
-69fbd5817a3e   7614ae9453d1   "docker-entrypoint.s…"   2 seconds ago        Up 2 seconds                                                                  redis-slave2
-77c0f4307238   7614ae9453d1   "docker-entrypoint.s…"   19 seconds ago       Up 19 seconds                                                                 redis-slave1
-c5ad43e8bc3f   7614ae9453d1   "docker-entrypoint.s…"   About a minute ago   Up About a minute                                                             redis-master
+
+
+#### 配置日志文件
+
+> 配置redis 配置文件方便排错
+
+1. redis.conf 的配置  日志文件指的是容器中的文件，千万别理解为**宿主机中的路径**
+
+```
+#开启日志的级别
+loglevel notice
+#日志路径
+logfile "/data/log/redis.log"
 ```
 
 
 
-#### 构建redis主从关系
+2. 创建/data/log/redis.log
+
+```
+#先进入redis容器  创建目录
+[root@hadoop100 conf]# docker exec -it redis-master /bin/bash
+root@96b1263ba02d:/data# ls
+appendonly.aof	dump.rdb
+root@96b1263ba02d:/data# mkdir log
+root@96b1263ba02d:/data# ls
+appendonly.aof	dump.rdb  log
+root@96b1263ba02d:/data# cd log
+root@96b1263ba02d:/data/log# touch redis.log
+root@96b1263ba02d:/data/log# ls
+redis.log
+```
+
+
+
+
+
+#### 查看redis主从关系
 
 解释
 
@@ -5312,7 +5472,595 @@ c5ad43e8bc3f   7614ae9453d1   "docker-entrypoint.s…"   About a minute ago   Up
 - --cluster-replicas 12                                                    表示一个master搭建一个slave节点
 
 ```
-#先进入一个redis
+# 主机查看
+[root@hadoop100 conf]# docker exec -it redis-master bash -c "redis-cli -h 127.0.0.1 -p 6379"
+127.0.0.1:6379> ping
+(error) NOAUTH Authentication required.
+127.0.0.1:6379> auth 123456
+OK
+127.0.0.1:6379> info replication
+# Replication
+role:master
+connected_slaves:2
+slave0:ip=172.17.0.1,port=6379,state=online,offset=84,lag=1
+slave1:ip=172.17.0.1,port=6379,state=online,offset=84,lag=1
+master_failover_state:no-failover
+master_replid:d94792c0de6cf5a9b1918a7ea39fabe2130cb07a
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:84
+second_repl_offset:-1
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1
+repl_backlog_histlen:84
+
+
+# 从机查看
+[root@hadoop100 conf]# docker exec -it redis-slave1 /bin/bash
+root@e5b0e470d0bc:/data# redis-cli -p 6379
+127.0.0.1:6379> ping
+(error) NOAUTH Authentication required.
+127.0.0.1:6379> auth 123456
+OK
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6400
+master_link_status:up
+master_last_io_seconds_ago:7
+master_sync_in_progress:0
+slave_read_repl_offset:350
+slave_repl_offset:350
+slave_priority:100
+slave_read_only:1
+replica_announced:1
+connected_slaves:0
+master_failover_state:no-failover
+master_replid:d94792c0de6cf5a9b1918a7ea39fabe2130cb07a
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:350
+second_repl_offset:-1
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1
+repl_backlog_histlen:350
+127.0.0.1:6379> set k2 v2
+(error) READONLY You can't write against a read only replica.  // 从机只能查不能写
+127.0.0.1:6379> get k1
+"v1"
+
+
+```
+
+
+
+#### 开启端口对外暴露
+
+```
+# 开启放端口6400
+[root@hadoop100 myredis]# firewall-cmd --zone=public --add-port=6400/tcp --permanent  
+success
+#立刻生效
+[root@hadoop100 myredis]# firewall-cmd --reload 
+success
+# 查看暴露的端口
+[root@hadoop100 myredis]# firewall-cmd --zone=public --list-ports
+6400/tcp
+[root@hadoop100 myredis]# firewall-cmd --zone=public --add-port=6401/tcp --permanent 
+success
+[root@hadoop100 myredis]# firewall-cmd --zone=public --add-port=6402/tcp --permanent 
+success
+
+```
+
+
+
+####  注意事项
+
+daemonize 后台运行
+
+注意：
+
+1.docker -d 已经是后台运行了，所以在redis.conf的配置里，daemonize 设置为no，如果是yes，会出现冲突，然后启动不了redis容器
+
+2.在docker 启动的情况下如果重启防火墙需要重写启动docker  systemctl restart docker
+
+> docker start imageID  异常信息
+
+```
+Error response from daemon: driver failed programming external connectivity on endpoint redis-master (97283eb2c3a7ac3d64ecfcad09bcc6f3922f610fd609bb3b1c216d06c49c7861):  (iptables failed: iptables --wait -t nat -A DOCKER -p tcp -d 0/0 --dport 6400 -j DNAT --to-destination 172.17.0.2:6379 ! -i docker0: iptables: No chain/target/match by that name.
+ (exit status 1))
+Error: failed to start containers: 96b1263ba02d
+
+```
+
+
+
+### 总结
+
+1. 从机可以执行写命令吗？
+
+   ```
+   # 不能
+   [root@hadoop100 ~]# docker exec -it redis-slave1 /bin/bash
+   root@e5b0e470d0bc:/data# redis-cli
+   127.0.0.1:6379> auth 123456
+   OK
+   127.0.0.1:6379> set k3 v3
+   (error) READONLY You can't write against a read only replica.
+   
+   ```
+
+2. 从机切入点问题
+
+   ```
+   # 首次启动会获取所有的数据，后续跟随，master写salve跟
+   
+   #主机目前的数据
+   127.0.0.1:6379> keys *
+   1) "k2"
+   2) "name"
+   3) "k1"
+   
+   #模仿从机宕机 redis-slave1 宕机
+   127.0.0.1:6379> SHUTDOWN
+   [root@hadoop100 ~]# 
+   
+   # 主机继续插入k3 
+   127.0.0.1:6379> set k3 v3
+   OK
+   
+   # 从机redis-slave2去get k3 
+   127.0.0.1:6379> get k3
+   "v3"
+   
+   #重写启动redis-slave1 查看是否有k3
+   [root@hadoop100 ~]# docker exec -it redis-slave1 /bin/bash
+   root@e5b0e470d0bc:/data# redis-cli
+   127.0.0.1:6379> auth 123456
+   OK
+   127.0.0.1:6379> get k3
+   "v3"
+   
+   ```
+
+3. 主机宕机后，从机会上位吗？
+
+   ```
+   #从机不动，原地待命，从机的数据可以正常使用：等待主机重新归来。
+   #主机宕机 使用shutdown 不会停止docker 容器
+   [root@hadoop100 ~]# docker stop redis-master 
+   redis-master
+   
+   #查看从机状态
+   127.0.0.1:6379> info replication
+   # Replication
+   role:slave
+   master_host:192.168.206.100
+   master_port:6400
+   master_link_status:down
+   #从机还是可以继续获取之前的数据
+   127.0.0.1:6379> get name
+   "wmt"
+   
+   
+   # 重新启动主机
+   [root@hadoop100 ~]# docker restart redis-master 
+   redis-master
+   [root@hadoop100 ~]# docker ps
+   CONTAINER ID   IMAGE          COMMAND                   CREATED      STATUS          PORTS                                       NAMES
+   83dc49b8f6d0   7614ae9453d1   "docker-entrypoint.s…"   7 days ago   Up 2 hours      0.0.0.0:6402->6379/tcp, :::6402->6379/tcp   redis-slave2
+   e5b0e470d0bc   7614ae9453d1   "docker-entrypoint.s…"   7 days ago   Up 19 minutes   0.0.0.0:6401->6379/tcp, :::6401->6379/tcp   redis-slave1
+   96b1263ba02d   7614ae9453d1   "docker-entrypoint.s…"   7 days ago   Up 4 seconds    0.0.0.0:6400->6379/tcp, :::6400->6379/tcp   redis-master
+   [root@hadoop100 ~]# docker exec -it redis-master /bin/bash
+   root@96b1263ba02d:/data# redis-cli
+   127.0.0.1:6379> auth 123456
+   OK
+   127.0.0.1:6379> info replication
+   # Replication 仍然是主机
+   role:master
+   connected_slaves:2
+   slave0:ip=172.17.0.1,port=6379,state=online,offset=56,lag=0
+   slave1:ip=172.17.0.1,port=6379,state=online,offset=56,lag=0
+   
+   ```
+
+   
+
+
+
+
+
+
+
+### 改换门庭
+
+
+
+#### 自立为王
+
+> 当前环境是一主二从    二从需要改成各自为王
+
+```
+#修改 redis_slave1的配置文件
+-rw-r--r--. 1 root root 738 8月  23 11:26 redis_slave1.conf
+[root@hadoop100 conf]# vim redis_slave1.conf 
+
+#把配置文件注释掉
+#replicaof 192.168.206.100 6400
+
+#修改 redis_slave2的配置文件
+-rw-r--r--. 1 root root 738 8月  23 11:26 redis_slave2.conf
+[root@hadoop100 conf]# vim redis_slave2.conf 
+
+#重新启动
+[root@hadoop100 conf]# docker restart redis-slave1 redis-slave2
+redis-slave1
+redis-slave2
+
+# 查看redis-slave1 的状态是 master了
+[root@hadoop100 conf]# vim redis_slave1.conf 
+[root@hadoop100 conf]# docker exec -it redis-slave1 /bin/bash
+root@e5b0e470d0bc:/data# redis-cli
+127.0.0.1:6379> auth 123456
+OK
+127.0.0.1:6379> info replication
+# Replication
+role:master
+connected_slaves:0
+
+# 查看redis-slave2 的状态是 master了
+[root@hadoop100 conf]# docker restart redis-slave1 redis-slave2
+redis-slave1
+redis-slave2
+[root@hadoop100 conf]# docker exec -it redis-slave2 /bin/bash
+root@83dc49b8f6d0:/data# redis-cli
+127.0.0.1:6379> auth 123456
+OK
+127.0.0.1:6379> info replication
+# Replication
+role:master
+connected_slaves:0
+
+```
+
+
+
+#### 当舔狗
+
+- 基本语法
+  - salveof  主库IP 主库端口
+
+```
+#从机redis_slave1重新回去当舔狗1
+127.0.0.1:6379> SLAVEOF 192.168.206.100 6400
+OK
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6400
+master_link_status:up
+
+#从机redis_slave2重新回去当舔狗
+127.0.0.1:6379> SLAVEOF 192.168.206.100 6400
+OK
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6400
+# 主机信息
+127.0.0.1:6379> info replication
+# Replication
+role:master
+connected_slaves:2
+slave0:ip=172.17.0.1,port=6379,state=online,offset=10528,lag=0
+slave1:ip=172.17.0.1,port=6379,state=online,offset=10528,lag=0
+master_failover_state:no-failover
+```
+
+
+
+- 注意重启之后会恢复为master
+
+
+
+### 薪火相传
+
+> 当前环境一主二从
+
+上一个slave 可以是下一个slave的master，slave同样可以接收slaves的连接和同步请求，那么该slave作为了链条中下一个的可以有效减轻主master的写压力
+
+```
+#主机
+127.0.0.1:6379> info replication
+# Replication
+role:master
+connected_slaves:2
+slave0:ip=172.17.0.1,port=6379,state=online,offset=11424,lag=0
+slave1:ip=172.17.0.1,port=6379,state=online,offset=11424,lag=1
+
+
+#从机redis_slave1
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6400
+master_link_status:up
+
+#从机redis_slave2
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6400
+master_link_status:up
+
+```
+
+
+
+#### 改换门庭 （临时改换）
+
+> 让 redis_slave2  去当 redis_slave1 的舔狗
+
+临时的改换门庭
+
+中途变更转向：会清除之前的数据，重新建立拷贝最新的
+
+- 基本语法
+  - slaveof 新主库IP  新主库端口
+
+```
+127.0.0.1:6379> SLAVEOF 192.168.206.100 6401
+OK
+
+# redis_slave2 改成去舔  redis_slave1 
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6401  # redis_slave1 的端口号
+connected_slaves:0 #表示下面的从机有几个
+
+# redis_slave1 的信息
+127.0.0.1:6379> info replication
+# Replication
+role:slave
+master_host:192.168.206.100
+master_port:6400
+master_link_status:up
+master_last_io_seconds_ago:5
+master_sync_in_progress:0
+slave_read_repl_offset:13188
+slave_repl_offset:13188
+slave_priority:100
+slave_read_only:1 # 从机只读在线
+replica_announced:1
+
+
+
+```
+
+
+
+### 反客为主
+
+> 谁也不跟了，自己当master
+
+
+
+- 基本语法
+
+  - salve no one
+
+  ```
+  [root@hadoop100 ~]# docker exec -it redis-slave1 /bin/bash
+  root@e5b0e470d0bc:/data# redis-cli -a 123456
+  Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe.
+  127.0.0.1:6379> info replication
+  # Replication
+  role:slave   #当前redis为从机 
+  master_host:192.168.206.100
+  master_port:6400
+  master_link_status:up
+  master_last_io_seconds_ago:6
+  master_sync_in_progress:0
+  slave_read_repl_offset:1736
+  slave_repl_offset:1736
+  slave_priority:100    
+  slave_read_only:1     #虽然自己是奴隶 但是手下还有奴隶
+  replica_announced:1
+  connected_slaves:0
+  master_failover_state:no-failover
+  master_replid:6f1d3cf84198693dc155bbea2de07c15dd6b7b21
+  master_replid2:0000000000000000000000000000000000000000
+  master_repl_offset:1736
+  second_repl_offset:-1
+  repl_backlog_active:1
+  repl_backlog_size:1048576
+  repl_backlog_first_byte_offset:1
+  repl_backlog_histlen:1736
+  
+  
+  #现在需要自立为王
+  127.0.0.1:6379> slaveof no one 
+  OK
+  127.0.0.1:6379> info replication 
+  # Replication
+  role:master   # 自己已经是master了
+  connected_slaves:0
+  master_failover_state:no-failover
+  master_replid:3a2e21e1c3f31b96400aa8dd550e6c9266fc77af
+  master_replid2:6f1d3cf84198693dc155bbea2de07c15dd6b7b21
+  master_repl_offset:2086
+  second_repl_offset:2087
+  repl_backlog_active:1
+  repl_backlog_size:1048576
+  repl_backlog_first_byte_offset:1
+  repl_backlog_histlen:2086
+  ```
+
+
+
+### 复制原理和工作流程
+
+
+
+- slave启动，同步初请
+
+  - slave 启动成功连接到master后会发送一个sync（同步）命令 
+  - slave首次全新连接master,一次完全同步(全量复制)将被自动执行，slave自身原有数据会被master数据覆盖清除
+
+- 首次连接，全量复制
+
+  - master节点收到sync命令后会开始在后台保存快照(即RDB持久化，主从复制时会触发RDB)，同时收集所有接收到的用于修改数据集命令缓存起来，master 节点执行RDB持久化完后，master将rdb快照文件和所有缓存的命令发送到所有slave,以完成一次完全同步
+  - 而slave服务在接收到数据库文件数据后，将其存盘并加载到内存中，从而完成复制初始化
+
+- 心跳持续，保持通信
+
+  - repl-ping-replica-period 10
+    - master 发 PING包的周期，默认是10秒
+
+- 进入平稳，增量复制
+
+  - master继续将新的所有收集到的修改命令自动依次传给slave，完成同步
+
+- 从机下线，重连续传
+
+  - master会检查backlog里面的offset，master和slave 都会保存一个复制的offset还有- -个masterId,offset是保存在backlog中的。Master只会把已经复制的offset后面的数据复制给Slave，类似断点续传。
+
+  
+
+### 复制的缺点
+
+- 复制延时，信号衰弱
+
+  - 由于所有的写操作都是先在Master上操作，然后同步更新到Slave上，所以从Master同步到Slave机器有- -定的延迟， 当系统很繁忙的时候，延迟问题会更加严重，Slave机器数量的增加也会使这个问题更加严重。
+
+    
+
+- master挂了怎么办
+
+  - 默认情况，不会在slave节点中自动重选一个master
+
+
+
+## Redis哨兵
+
+### 是什么
+
+  > 吹哨人巡查监控后台master主机是否故障，如果故障了根据投票数自动将某一个从库转换成新主库，继续对外服务
+
+- 作用
+
+  - 监控redis运行状态，包括master和slave
+  - 当master down机后，能自动将slave切换成新的master
+
+- 官网
+
+  [High availability with Redis Sentinel | Redis](https://redis.io/docs/management/sentinel/)
+
+
+
+### 能干嘛
+
+1. 主从监控
+   - 监控主从redis库运行是否正常
+2. 消息通知
+   - 哨兵可以将故障转移的结果发送给客户端
+3. 故障转移
+   - 如果Master异常，则会进行主从切换，将其中一个slave做为新Master
+4. 配置中心
+   - 客户端通过连接哨兵来获取当前Redis服务的主节点地址
+
+
+
+### Redis Sentinel 架构
+
+本次案例：
+
+- 三个哨兵
+  - 自动监控和维护集群，不存放数据, 只做吹哨人
+- 一主二从
+  - 一个Master两个slave
+
+
+
+<img src=".\imgs\image-20230910150608094.png" alt="image-20230910150608094" style="zoom:67%;" />
+
+
+
+
+
+### 配置文件
+
+
+
+- protected-mode no     			安全保护模式
+- port 26379                                端口
+- daemonize no                         是否以后台daemonize方式运行
+- logfile ""                                    日志
+- dir                                               工作目录
+- pidfile                                       pid文件路径
+- sentinel failover-timeout mymaster 180000
+  - 指定多少毫秒之后，主节点没有应答哨兵，此时哨兵主观上认为主节点下线
+- sentinel monitor <master-name> <ip> <redis-port> <quorum>
+  - 设置要监控的master主机
+  - quorum  表示最少几个哨兵认可客观下线  同意故障迁移的法定票数
+    - 我们知道，网络是不可靠的，有时候一个sentinel会因为网络堵塞而误以为一个master redis已经死掉了，在sentinel集群环境下需要多个sentinel互相沟通来确认某个master是否真的死了，quorum这个参数是进行客观下线的一个依据，意思是至少有quorum个sentinel认为这个master有故障，才会对这个master进行下线以及故障转移。因为有的时候，某个sentinel|节点可能因为自身网络原因，导致无法连接master,而此时master并没有出现故障，所以，这就需要多个sentine|都一 致认为该master有问题，才可以进行下一步操作，这就保证了公平性和高可用。
+- sentinel auth-pass <master-name> <password>
+  - master设置了密码，连接master服务的密码
+- sentinel parallel-syncs <master-name> <numreplicas>
+  - 表示允许并行同步的slave个数， 当Master挂了后，哨兵会选出新的Master,此时，剩余的slave会向新的master发起同步数据
+- sentinel failover-timeout <master-name> <milliseconds>
+  - 故障转移的超时时间，进行故障转移时，如果超过设置的亳秒，表示故障转移失败
+- sentinel notification-script <master-name> <script-path>
+  - 配置当某一事件发生时所需要执行的脚本
+- sentinel client-reconfig-script <master-name> <script-path>
+  - 客户端重新配置主节点参数脚本
+
+
+
+### Runing sentinel （启动哨兵）
+
+#### sentinel 架构
+
+> 架构图
+
+<img src=".\imgs\image-20230910150608094.png" alt="image-20230910150608094" style="zoom:67%;" />
+
+- 哨兵集群
+  - Sentinel 1      port  26400
+  - sentinel 2      port   26401
+  - Sentinel 3      port   26402
+
+
+
+#### 配置sentinel
+
+查看master的IP地址·
+
+```
+[root@hadoop100 /]# docker inspect redis-master | grep IP
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "172.17.0.3",  # IP地址
+            "IPPrefixLen": 16,
+            "IPv6Gateway": "",
+                    "IPAMConfig": null,
+                    "IPAddress": "172.17.0.3",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
 
 ```
 
@@ -5320,11 +6068,481 @@ c5ad43e8bc3f   7614ae9453d1   "docker-entrypoint.s…"   About a minute ago   Up
 
 
 
+sentinel 1 的配置
+
+```conf
+# Example sentinel 26400.conf
+
+protected-mode no
+
+port 26400
+
+daemonize no
+
+pidfile /var/run/redis-sentinel.pid
+
+#logfile "/data/centinel/centinel26400.log"
+
+dir /tmp
+
+sentinel monitor mymaster 172.17.0.3 6400 2
+
+sentinel auth-pass mymaster 123456
+```
 
 
 
 
 
+sentinel 2配置      port   26401
 
-## Redis哨兵
+```conf
+# Example sentinel 26401.conf
+
+protected-mode no
+
+port 26401
+
+daemonize no
+
+pidfile /var/run/redis-sentinel.pid
+
+#logfile "/redis/sentinel26401.log"
+
+dir /tmp
+
+sentinel monitor mymaster 172.17.0.3 6400 2
+
+sentinel auth-pass mymaster 123456
+```
+
+
+
+
+
+Sentinel 3配置      port   26402
+
+```conf
+# Example sentinel 26402.conf
+
+protected-mode no
+
+port 26402
+
+daemonize no
+
+pidfile /var/run/redis-sentinel.pid
+
+#logfile "/redis/sentinel26402.log"
+
+dir /tmp
+
+sentinel monitor mymaster 172.17.0.3 6400 2
+
+sentinel auth-pass mymaster 123456
+```
+
+
+
+
+
+设置redis 6400  master 的配置文件
+
+因为主机可能宕机会变成从机
+
+```
+#设置master密码 
+masterauth "123456"
+```
+
+
+
+创建哨兵集群sentinel的目录结构
+
+```
+/myredis_sentinel/myredis_sentinel
+									/sentinel26400	
+                                    		/sentinel26400.conf
+									/sentinel26401
+											/sentinel26401.conf
+									/sentinel26402
+											/sentinel26402.conf
+```
+
+
+
+
+
+创建sentinel 1 的配置文件
+
+```
+[root@hadoop100 sentinel26400]# vim sentinel26400.conf	
+[root@hadoop100 sentinel26400]# ls
+sentinel26400
+
+```
+
+
+
+创建sentinel 2 的配置文件
+
+```
+[root@hadoop100 sentinel26401]# vim sentinel26401.conf
+[root@hadoop100 sentinel26401]# ls
+sentinel26401
+
+```
+
+
+
+创建sentinel 3 的配置文件
+
+```
+[root@hadoop100 sentinel26402]# vim sentinel26402.conf
+[root@hadoop100 sentinel26402]# ls
+sentinel26402
+
+```
+
+
+
+#### 运行docker 容器
+
+运行docker容器
+
+```
+# sentinel26400 的哨兵
+docker run --name sentinel26400  -v  /myredis_sentinel/myredis_sentinel/sentinel26400/sentinel26400.conf:/usr/local/etc/redis/sentinel.conf -d --net=host redis redis-sentinel /usr/local/etc/redis/sentinel.conf
+
+# sentinel26401 的哨兵
+docker run --name sentinel26401  -v  /myredis_sentinel/myredis_sentinel/sentinel26401/sentinel26401.conf:/usr/local/etc/redis/sentinel.conf -d --net=host redis redis-sentinel /usr/local/etc/redis/sentinel.conf
+
+# sentinel26402 的哨兵
+docker run --name sentinel26402  -v  /myredis_sentinel/myredis_sentinel/sentinel26402/sentinel26402.conf:/usr/local/etc/redis/sentinel.conf -d --net=host redis redis-sentinel /usr/local/etc/redis/sentinel.conf
+```
+
+
+
+配置日志  /data/centinel/centinel26400.log    以此操作更改26401和26402哨兵
+
+```
+[root@hadoop100 myredis_sentinel]# docker exec -it sentinel26400 /bin/bash
+root@hadoop100:/data# mkdir sentinel
+root@hadoop100:/data# ls
+sentinel
+root@hadoop100:/data# cd centinel/
+root@hadoop100:/data/centinel# touch sentinel26400.log
+root@hadoop100:/data/centinel# ls
+sentinel26400.log
+
+```
+
+
+
+修改redis6400.conf
+
+```
+logfile "/data/sentinel/sentinel26400.log"
+
+logfile "/data/sentinel/sentinel26401.log"
+
+logfile "/data/sentinel/sentinel26402.log"
+```
+
+
+
+查看运行的redis和哨兵的运行
+
+```
+[root@hadoop100 myredis_sentinel]# ps -ef|grep redis
+polkitd   11718  11694  0 16:24 ?        00:00:01 redis-server 0.0.0.0:6379
+polkitd   11876  11855  0 16:24 ?        00:00:00 redis-server 0.0.0.0:6379
+polkitd   12039  12019  0 16:24 ?        00:00:00 redis-server 0.0.0.0:6379
+root      12216  12193  0 16:25 ?        00:00:01 redis-sentinel *:26401 [sentinel]
+root      12291  12270  0 16:25 ?        00:00:01 redis-sentinel *:26402 [sentinel]
+root      12360  12340  0 16:25 ?        00:00:01 redis-sentinel *:26400 [sentinel]
+root      13026  12950  0 16:33 pts/4    00:00:00 grep --color=auto redis
+
+```
+
+
+
+#### 查看sentinel信息
+
+进入哨兵查看日志
+
+```
+root@hadoop100:/data/sentinel# [root@hadoop100 myredis]# docker exec -it sentinel26402 /bin/bash
+# 查看日志
+root@hadoop100:/data# cat sentinel/sentinel26402.log   
+1:X 17 Sep 2023 11:44:57.224 # User requested shutdown...
+1:X 17 Sep 2023 11:44:57.224 * Removing the pid file.
+1:X 17 Sep 2023 11:44:57.225 # Sentinel is now ready to exit, bye bye...
+1:X 17 Sep 2023 11:54:04.221 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+#redis 的版本信息
+1:X 17 Sep 2023 11:54:04.221 # Redis version=6.2.6, bits=64, commit=00000000, modified=0, pid=1, just started
+1:X 17 Sep 2023 11:54:04.221 # Configuration loaded
+1:X 17 Sep 2023 11:54:04.222 * monotonic clock: POSIX clock_gettime
+#当前哨兵的信息
+1:X 17 Sep 2023 11:54:04.223 * Running mode=sentinel, port=26402.
+1:X 17 Sep 2023 11:54:04.224 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+1:X 17 Sep 2023 11:54:04.225 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 11:54:04.225 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+1:X 17 Sep 2023 11:54:04.225 # Sentinel ID is 1d7f800796eaee02e5957968e192a42ccfdeda17
+1:X 17 Sep 2023 11:54:04.225 # +monitor master mymaster 172.17.0.3 6400 quorum 2
+#从机信息
+1:X 17 Sep 2023 11:54:04.227 * +slave slave 172.17.0.4:6401 172.17.0.4 6401 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 11:54:04.229 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 11:54:04.229 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+#从机信息
+1:X 17 Sep 2023 11:54:04.230 * +slave slave 172.17.0.2:6402 172.17.0.2 6402 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 11:54:04.231 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 11:54:04.231 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+#其它哨兵
+1:X 17 Sep 2023 11:54:05.618 * +sentinel sentinel 2a7262b728e56983b224f9a33c240e65e1da834e 172.17.0.1 26400 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 11:54:05.619 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 11:54:05.619 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+Device or resource busy
+#其它哨兵
+1:X 17 Sep 2023 11:54:05.896 * +sentinel sentinel 3239a0f85a64af380bd852049d3ff54924c8cd09 172.17.0.1 26401 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 11:54:05.897 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 11:54:05.897 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+
+```
+
+
+
+进入sentinel 查看详细信息
+
+```
+root@hadoop100:/data/sentinel# [root@hadoop100 myredis]# docker exec -it sentinel26402 /bin/bash
+root@hadoop100:/data# redis-cli -p 26402
+127.0.0.1:26402> info sentinel
+# Sentinel
+sentinel_masters:1
+sentinel_tilt:0
+sentinel_running_scripts:0
+sentinel_scripts_queue_length:0
+sentinel_simulate_failure_flags:0
+master0:name=mymaster,status=ok,address=172.17.0.3:6400,slaves=2,sentinels=3
+
+```
+
+
+
+#### 模拟master主机DOWN机
+
+
+
+master 宕机
+
+```
+[root@hadoop100 /]# docker stop redis-master 
+redis-master
+```
+
+
+
+此时内部哨兵重新选取master
+
+6402
+
+```
+# 这次是6402被选取为master
+127.0.0.1:6402> info replication
+# Replication
+role:master
+connected_slaves:1
+slave0:ip=172.17.0.4,port=6401,state=online,offset=273976,lag=1
+master_failover_state:no-failover
+master_replid:af02ab18fa3a9974b3910acf43e02090cfbe39d4
+master_replid2:43b6091b2db7ead3f1802ea5fe74c605746b72ca
+master_repl_offset:274111
+second_repl_offset:271375
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1
+repl_backlog_histlen:274111
+127.0.0.1:6402> set k5 v5
+OK
+```
+
+
+
+6401 为6402的从机
+
+```
+127.0.0.1:6401> info replication
+#从机会重连
+Error: Server closed the connection
+127.0.0.1:6401> info replication
+# Replication
+role:slave
+master_host:172.17.0.2
+master_port:6402
+master_link_status:up
+master_last_io_seconds_ago:1
+master_sync_in_progress:0
+slave_read_repl_offset:286239
+slave_repl_offset:286239
+slave_priority:100
+slave_read_only:1
+replica_announced:1
+connected_slaves:0
+master_failover_state:no-failover
+master_replid:af02ab18fa3a9974b3910acf43e02090cfbe39d4
+master_replid2:43b6091b2db7ead3f1802ea5fe74c605746b72ca
+master_repl_offset:286239
+second_repl_offset:271375
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1
+repl_backlog_histlen:286239
+
+```
+
+
+
+#### 查看日志
+
+```
+root@hadoop100:/data# cat sentinel/sentinel26402.log 
+#主机宕机了
+1:X 17 Sep 2023 12:10:51.803 # +sdown master mymaster 172.17.0.3 6400
+#客观下线6400
+1:X 17 Sep 2023 12:10:51.867 # +odown master mymaster 172.17.0.3 6400 #quorum 2/2
+#一个新的时代 开始重新选举
+1:X 17 Sep 2023 12:10:51.867 # +new-epoch 1
+1:X 17 Sep 2023 12:10:51.867 # +try-failover master mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:51.869 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 12:10:51.869 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+#这次投票的领导是1d7f800796eaee02e5957968e192a42ccfdeda17
+1:X 17 Sep 2023 12:10:51.869 # +vote-for-leader 1d7f800796eaee02e5957968e192a42ccfdeda17 1
+1:X 17 Sep 2023 12:10:51.872 # 3239a0f85a64af380bd852049d3ff54924c8cd09 voted for 1d7f800796eaee02e5957968e192a42ccfdeda17 1
+1:X 17 Sep 2023 12:10:51.872 # 2a7262b728e56983b224f9a33c240e65e1da834e voted for 1d7f800796eaee02e5957968e192a42ccfdeda17 1
+1:X 17 Sep 2023 12:10:51.972 # +elected-leader master mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:51.972 # +failover-state-select-slave master mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.025 # +selected-slave slave 172.17.0.2:6402 172.17.0.2 6402 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.025 * +failover-state-send-slaveof-noone slave 172.17.0.2:6402 172.17.0.2 6402 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.079 * +failover-state-wait-promotion slave 172.17.0.2:6402 172.17.0.2 6402 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.494 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 12:10:52.494 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+1:X 17 Sep 2023 12:10:52.494 # +promoted-slave slave 172.17.0.2:6402 172.17.0.2 6402 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.494 # +failover-state-reconf-slaves master mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.584 * +slave-reconf-sent slave 172.17.0.4:6401 172.17.0.4 6401 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:52.993 # -odown master mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:53.502 * +slave-reconf-inprog slave 172.17.0.4:6401 172.17.0.4 6401 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:53.502 * +slave-reconf-done slave 172.17.0.4:6401 172.17.0.4 6401 @ mymaster 172.17.0.3 6400
+1:X 17 Sep 2023 12:10:53.565 # +failover-end master mymaster 172.17.0.3 6400
+#选择6402为master
+1:X 17 Sep 2023 12:10:53.565 # +switch-master mymaster 172.17.0.3 6400 172.17.0.2 6402
+1:X 17 Sep 2023 12:10:53.566 * +slave slave 172.17.0.4:6401 172.17.0.4 6401 @ mymaster 172.17.0.2 6402
+1:X 17 Sep 2023 12:10:53.566 * +slave slave 172.17.0.3:6400 172.17.0.3 6400 @ mymaster 172.17.0.2 6402
+1:X 17 Sep 2023 12:10:53.589 # Could not rename tmp config file (Device or resource busy)
+1:X 17 Sep 2023 12:10:53.589 # WARNING: Sentinel was not able to save the new configuration on disk!!!: Device or resource busy
+1:X 17 Sep 2023 12:11:23.582 # +sdown slave 172.17.0.3:6400 172.17.0.3 6400 @ mymaster 172.17.0.2 6402
+
+```
+
+
+
+> 原来的master回来  只能当slave了
+
+
+
+启动之前的master
+
+```
+[root@hadoop100 /]# docker start redis-master 
+redis-master
+
+```
+
+
+
+6402 查看redis信息  6402仍然是master
+
+```
+127.0.0.1:6402> info replication
+# Replication
+role:master
+connected_slaves:2
+slave0:ip=172.17.0.4,port=6401,state=online,offset=481983,lag=1
+slave1:ip=172.17.0.3,port=6400,state=online,offset=0,lag=0
+master_failover_state:no-failover
+master_replid:af02ab18fa3a9974b3910acf43e02090cfbe39d4
+master_replid2:43b6091b2db7ead3f1802ea5fe74c605746b72ca
+master_repl_offset:482118
+second_repl_offset:271375
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1
+repl_backlog_histlen:482118
+
+```
+
+
+
+#### 哨兵运行流程
+
+- SDown  主管下线  Subjectively Down
+
+- Odown  客观下线  Objectively Down
+
+- 选取出领导者哨兵 领导哨兵选出兵王   选择领导哨兵采用的Raft算法，大概意思就是先到先得。
+
+- 由兵王（sentinel leader）选出新的master
+
+  
+
+  三个步骤
+
+  - 新王登基
+    - redis.conf文件中，优先级slave-priority或者replica-priority最高从节点 数字越小优先级越高。
+    - 复制偏移量位置offset最大从节点
+    - 最小RunID的从节点
+  - 群臣服首
+    - 执行 slaveof no one 命令让选择出来的从节点成为新的master 并通过slaveof命令让其它节点成为从节点
+    - sentinel leader 会对选举出的新master执行slaveof no one 操作，将其提升为master
+    - sentinel leader 向其它slave发送命令，让剩余的slave成为新的master节点的slave
+  - 旧主拜服
+    - 老master 回来也只能当新master的从节点
+
+
+
+
+
+## redis集群
+
+> 官网 [Redis cluster specification | Redis](https://redis.io/docs/reference/cluster-spec/)
+
+
+
+从redis哨兵到redis集群
+
+
+
+![image-20230924204826487](C:\Users\34912\Desktop\笔记\redis-study\imgs\image-20230924204826487.png)
+
+
+
+Redis集群是一个提供在多个Redis节点间共享数据的程序集
+
+Redis支持多个Master 每个Master后面又可以支持多个slave
+
+由于Cluster自带Sentinel的故障转移机制， 内置了高可用的支持，**无需再去使用哨兵功能**
+
+客户端与Redis的节点连接，不再需要连接集群中所有的节点，只需要任意连接集群中的一个可用节点即可
+
+**槽位slot**负责分配到各个物理服务节点，由对应的集群来负责维护节点、插槽和数据之间的关系
+
+
+
+官网[Redis cluster specification | Redis](https://redis.io/docs/reference/cluster-spec/#key-distribution-model)
+
+
+
+
+
+Redis**不保证数据强一致性**
 
