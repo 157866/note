@@ -5306,7 +5306,7 @@ dbfilename dump.rdb
 # 客户端连接数量设置
 maxclients 10000
 # AOF模式开启，默认关闭
-appendonly ye
+appendonly yes
 # 文件名
 appendfilename "appendonly.aof"
 # AOF同步机制 
@@ -5396,7 +5396,7 @@ docker run \
 -v /myredis/redis_master/conf/redis_master.conf:/etc/redis/redis.conf \
 -v /myredis/redis_master/data:/data \
 -v /etc/localtime:/etc/localtime \
--p 6400:6379 \
+-p 6400:6400 \
 -d 7614ae9453d1 redis-server /etc/redis/redis.conf
 
 
@@ -5407,7 +5407,7 @@ docker run \
 -v /myredis/redis_slave1/conf/redis_slave1.conf:/etc/redis/redis.conf \
 -v /myredis/redis_slave1/data:/data \
 -v /etc/localtime:/etc/localtime \
--p 6401:6379 \
+-p 6401:6401 \
 -d 7614ae9453d1 redis-server /etc/redis/redis.conf
 
 
@@ -5419,7 +5419,7 @@ docker run \
 -v /myredis/redis_slave2/conf/redis_slave2.conf:/etc/redis/redis.conf \
 -v /myredis/redis_slave2/data:/data \
 -v /etc/localtime:/etc/localtime \
--p 6402:6379 \
+-p 6402:6402 \
 -d 7614ae9453d1 redis-server /etc/redis/redis.conf
 
 
@@ -5564,7 +5564,7 @@ daemonize 后台运行
 
 1.docker -d 已经是后台运行了，所以在redis.conf的配置里，daemonize 设置为no，如果是yes，会出现冲突，然后启动不了redis容器
 
-2.在docker 启动的情况下如果重启防火墙需要重写启动docker  systemctl restart docker
+2.在docker 启动的情况下如果重启防火墙需要重写启动docker              systemctl restart docker
 
 > docker start imageID  异常信息
 
@@ -6545,4 +6545,694 @@ Redis支持多个Master 每个Master后面又可以支持多个slave
 
 
 Redis**不保证数据强一致性**
+
+
+
+实际搭建去看docker文档
+
+
+
+### 集群常用操作
+
+> 不在同一个slot槽位下的多键操作支持不好，通识占位符登场
+
+- mset k1 v1 k2 v2 k3 v3
+
+不在同一个slot槽位下的键值无法使用mset mget等多键操作
+
+
+
+- 可以通过{}来定义同一个组的概念，使用key中{}内容相同的键值对放到同一个slot槽位中去，对应下图类似 k1 k2 k3都映射为 x ，自然槽位一样
+- mset k1{x} v1 k2{x} v2 k3{x} v3
+
+
+
+
+
+> 集群是否完整才能对外提供服务
+
+- 基本语法
+  - cluster-require-full-coverage
+
+![image-20231002145936558](C:\Users\34912\Desktop\笔记\redis-study\imgs\image-20231002145936558.png)
+
+
+
+
+
+> 槽位数字编码
+
+- 基本语法
+  - cluster countkeysinslot
+    - 1 该槽位被占用
+    - 0 该槽位没占用
+
+
+
+> 键名称
+
+- 基本语法
+  - cluster keyslot  keyName
+  - 查看keyName的slot的槽位
+
+
+
+### CRC16校验
+
+> Redis集群有16384个哈希槽，每个key通过CRC16校验后对16384取模来决定放置哪个槽，集群的每个节点负责一部分hash槽
+
+
+
+
+
+## Spring Boot 集成 Redis
+
+> 总体概述
+
+- jedis                         第一代
+- lettuce                     第二代
+- RedisTemplate      第三代
+
+
+
+
+
+### 本地连接Redis常见问题
+
+1. bind配置注释掉
+2. 保护模式设置为no
+3. Linux系统的防火墙设置   或者  开启端口暴露
+4. redis服务器的IP地址和密码是否正确
+5. 忘记访问redis的服务器和端口号和auth密码
+
+
+
+
+
+### 集成Jedis
+
+> jeids Client 是Redis官网推荐的一个面向java客户端，库文件实现了对各类API进行封装调用
+
+
+
+#### 操作
+
+
+
+##### 建Model
+
+
+
+##### 改POM
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+<!--        引用jedis-->
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+        </dependency>
+```
+
+
+
+##### 写YML
+
+```properties
+server.port=7777
+
+spring.application.name=springBootRedis
+
+```
+
+
+
+##### 主启动
+
+```java
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class SpringBootRedisApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringBootRedisApplication.class, args);
+    }
+
+}
+
+```
+
+
+
+##### 业务类
+
+```java
+package com.example.demo;
+
+import redis.clients.jedis.Jedis;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * @author wmt
+ * @Title:
+ * @Package
+ * @Description:
+ * @date 2023/10/215:32
+ */
+public class JedisDemo {
+    public static void main(String[] args) {
+//        通过Ip地址和Port来获取连接 172.17.0.2
+        Jedis jedis = new Jedis("192.168.206.100", 6400);
+//        通过密码连接
+        jedis.auth("123456");
+        //测试连接
+        System.out.println(jedis.ping());
+        //全查
+        Set<String> keys = jedis.keys("*");
+        System.out.println(keys);
+        // setString
+        jedis.set("jedis", "hello_jedis");
+        System.out.println(jedis.ttl("jedis"));
+        System.out.println(jedis.get("jedis"));
+        // setList
+        jedis.lpush("jedisList","jedis1", "jedis2", "jedis3");
+        // getList
+        List<String> jedisList = jedis.lrange("jedisList", 0, -1);
+        for (String s : jedisList) {
+            System.out.println(s);
+        }
+        //set
+        jedis.sadd("setList", "1", "1", "2", "3");
+        //getList
+        Set<String> setList = jedis.smembers("setList");
+        for (String s : setList) {
+            System.out.println(s);
+        }
+        //移除集合中的列表
+        jedis.srem("setList", "1");
+        //判断集合中是否存在
+        Boolean b = jedis.sismember("setList", "1");
+        System.out.println(b);
+
+        //setHash
+        jedis.hset("mapName", "name", "wmt");
+        // 获取单个
+        System.out.println(jedis.hget("mapName", "name"));
+
+        HashMap<String, String> hashMap = new HashMap<>();
+        hashMap.put("age", "22");
+        hashMap.put("address", "成都");
+        // set 多个
+        jedis.hmset("hashMap", hashMap);
+        // 获取多个
+        System.out.println(jedis.hmget("hashMap", "age","address"));
+
+        //zset score 位于排序
+        jedis.zadd("zset" , 10,"v1");
+        jedis.zadd("zset", 30, "v2");
+        jedis.zadd("zset", 20, "v3");
+        Set<String> zset = jedis.zrange("zset", 0, -1);
+        for (String s : zset) {
+            System.out.println(s);
+        }
+
+    }
+}
+
+```
+
+
+
+
+
+### 集成lettuce
+
+> lettuce 翻译过来是生菜的意思 为了解决jedis的不足
+
+
+
+#### jedis和lettuce的区别
+
+jedis和L ettuce都是Redis的客户端，它们都可以连接Redis服务器，但是在SpringBoot2 .0之后默认都是使用的L ettuce这个客户端连接Redis服务器。因为当使用Jedis客户端连接Redis服务器的时候，每个线程都要拿自己创建的Jedis实例去连接Redis客户端，当有很多个线程的时候，不仅开销大需要反复的创建关闭一个Jedis连接， 而且也是线程不安全的，一个线程通过Jedis实例更改Redis服务器中的数据之后会影响另一个线程;
+但是如果使用Lettuce这个客户端连接Redis服务器的时候,就不会出现上面的情况，L ettuce底层使用的是Netty,当有多个线程都需要连接Redis服务器的时候，可以保证只创建一个Lettuce连接， 使所有的线程共享这一个Lettuce连接, 这样可以减少创建关闭一个Lettuce连接时候的开销;而且这种方式也是线程安全的，不会出现-个线程通过L ettuce更改Redis服务器中的数据之后而影响另一个线程的情况;
+
+
+
+#### 实际操作
+
+
+
+##### 改POM
+
+```
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+<!--        引用lettuce-->
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+```
+
+
+
+##### 主业务
+
+```java
+package com.example.demo;
+
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisCommands;
+
+import java.util.List;
+
+/**
+ * @author wmt
+ * @Title:
+ * @Package
+ * @Description:
+ * @date 2023/10/1413:59
+ */
+public class LettuceDemo {
+    public static void main(String[] args) {
+        //1, 使用构建器链式编程来builder 我们的RedisURI
+        RedisURI uri = RedisURI.builder()
+                .redis("192.168.206.100")
+                .withPort(6400)
+                .withAuthentication("default", "123456")
+                .build();
+        //2, 创建连接客户端
+        RedisClient redisClient = RedisClient.create(uri);
+        StatefulRedisConnection connect = redisClient.connect();
+        //3,创建操作的command，通过connect
+        RedisCommands commands = connect.sync();
+
+        //=====================================
+        List keys = commands.keys("*");
+        System.out.println(keys);
+
+        List zset = commands.zrange("zset", 0, -1);
+        System.out.println(zset);
+        //4, 关闭资源
+        try {
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            connect.close();
+            redisClient.shutdown();
+        }
+    }
+}
+
+```
+
+
+
+
+
+### 集成RedisTemplate
+
+##### POM文件
+
+```xml
+<!--        springboot 整合redis-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+<!--        swagger2-->
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger2</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger-ui</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+```
+
+
+
+
+
+#### 连接单机
+
+> swagger2  是一个会根据controller层自动生成的api UI
+
+
+
+##### 启动类
+
+```java
+package com.example.demo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+@SpringBootApplication
+@EnableSwagger2 //  不加这个启动无法访问swagger
+@ComponentScan(basePackages = "com.example")
+public class SpringBootRedisApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringBootRedisApplication.class, args);
+    }
+
+}
+```
+
+
+
+##### application 配置
+
+```properties
+server.port=7777
+
+spring.application.name=springBootRedis
+
+
+#=============================log================
+logging.level.root=info
+logging.level.com.example.demo=info
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger- %msg%n
+logging.file.name=../src/main/resources/redisLog/redis_study.log
+logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger- %msg%n
+
+
+#============================swagger============================
+spring.swagger2.enabled=true
+
+#在springboot2.6.X结合swagger2.9. X会提示documentationPluginsBootstrapper空措针异常,
+#原因是在springboot2.6.X中将SpringMVC默认路径匹配策略从AntPathMatcher更改为PathPatternParser,
+#导致出错，解决办法是matching-strategy切换回之前ant_ path_ matcher
+
+spring.mvc.pathmatch.matching-strategy=ant_path_matcher
+
+#=========================redis 单机===============================
+spring.redis.database=0
+#修改为真实的IP
+spring.redis.host=192.168.206.100
+spring.redis.port=6400
+spring.redis.password=123456
+spring.redis.lettuce.pool.max-active=8
+spring.redis.lettuce.pool.max-wait=1ms
+spring.redis.lettuce.pool.max-idle=8
+spring.redis.lettuce.pool.min-idle=0
+
+```
+
+
+
+##### swaggerConfig
+
+```java
+@EnableSwagger2
+public class SwaggerConfig {
+    @Value("${spring.swagger2.enabled}")
+    private Boolean enabled;
+
+    @Bean
+    public Docket createRestApi(){
+        return  new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(apiInfo())
+                .enable(enabled)
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.example")) //自己的package
+                .paths(PathSelectors.any())
+                .build();
+    }
+    public ApiInfo apiInfo(){
+        return new ApiInfoBuilder()
+                .title("springBoot利用swagger2构造api接口文档"+"\t"+ DateTimeFormatter
+                        .ofPattern("yyyy-MM-dd").format(LocalDateTime.now()))
+                .description("springBoot + redis整合")
+                .version("1.0")
+                .termsOfServiceUrl("https://www.baidu.com")
+                .build();
+    }
+}
+```
+
+
+
+##### RedisConfig
+
+为什么需要配置 redisConfig  因为会出现乱码
+
+![image-20231015161822269](.\imgs\image-20231015161822269.png)
+
+也无法通过正常的key 去获取
+
+![image-20231015162056459](.\imgs\image-20231015162056459.png)
+
+
+
+> 原因
+
+键(key) 和值(value) 都是通过Spring提供的Serializer序列化到数据库的。
+
+RedisTemplate默认使用的是JdkSerializationRedisSerializer,
+
+StringRedisTemplate默认使用的是StringRedisSerializer.
+
+KEY被序列化成这样,线上通过KEY去查询对应的VALUE非常不方便,
+
+
+
+```java
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+/**
+ * @author wmt
+ * @Title:
+ * @Package
+ * @Description:
+ * @date 2023/10/1515:11
+ */
+@Configuration
+public class RedisConfig {
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(LettuceConnectionFactory lettuceConnectionFactory){
+        RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+
+        redisTemplate.setConnectionFactory(lettuceConnectionFactory);
+        //设置key序列化的方式
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        //设置value的序列化方式json  使用GenericJackson2JsonRedisSerializer 替换默认的序列化
+        redisTemplate.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+
+        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+        redisTemplate.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+
+        redisTemplate.afterPropertiesSet();
+        return redisTemplate;
+
+
+    }
+}
+```
+
+
+
+
+
+##### Service
+
+```java
+package com.example.demo.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * @author wmt
+ * @Title:
+ * @Package
+ * @Description:
+ * @date 2023/10/1515:27
+ */
+@Service
+@Slf4j
+public class OrderService {
+    public static final String ORDER_KEY = "ord:";
+    @Resource
+    private RedisTemplate redisTemplate;   // 这个会出现 key 和 value 中文乱码问题
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+
+    // 添加订单
+    public void addOrder(){
+        int keyId = ThreadLocalRandom.current().nextInt(1000) + 1;
+        String serialNo = UUID.randomUUID().toString();
+
+        String key = ORDER_KEY + keyId;
+        String value = "pdd订单" + serialNo;
+
+        stringRedisTemplate.opsForValue().set(key, value);
+
+        log.info("key = {}", key);
+        log.info("value = {}", value);
+    }
+
+    // 获取订单
+    public String getOrderById(Integer keyId){
+        return (String) stringRedisTemplate.opsForValue().get(ORDER_KEY + keyId);
+    }
+}
+
+```
+
+
+
+为什么 StringRedisTemplate 不会出现乱码问题
+
+下面是源码
+
+```java
+public class StringRedisTemplate extends RedisTemplate<String, String> {
+    public StringRedisTemplate() {
+        this.setKeySerializer(RedisSerializer.string());
+        this.setValueSerializer(RedisSerializer.string());
+        this.setHashKeySerializer(RedisSerializer.string());
+        this.setHashValueSerializer(RedisSerializer.string());
+    }
+```
+
+
+
+因为StringRedisTemplate 自己去set序列化的规则
+
+
+
+
+
+##### Controller
+
+```java
+package com.example.demo.controller;
+
+import com.example.demo.service.OrderService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+/**
+ * @author wmt
+ * @Title:
+ * @Package
+ * @Description:
+ * @date 2023/10/1515:37
+ */
+@RestController
+@Slf4j
+@Api(tags = "订单接口")
+public class OrderController {
+    @Resource
+    private OrderService orderService;
+    @ApiOperation("新增订单")
+    @PostMapping("/oder/add")
+    public void addOder(){
+        orderService.addOrder();
+    }
+    @ApiOperation("通过id获取订单")
+    @GetMapping("/order/get/{id}")
+    public String getOrderById(@PathVariable Integer id){
+        return orderService.getOrderById(id);
+    }
+}
+
+```
+
+
+
+##### 测试
+
+swagger2 测试接口： [Swagger UI](http://localhost:7777/swagger-ui.html#/)
+
+查看redis数据  --raw 支持中文连接
+
+```
+redis-cli -a 123456 -p 6400 --raw
+```
+
+前提是 通过 StringRedisTemplate来set
+
+![image-20231015163758700](.\imgs\image-20231015163758700.png)
+
+
+
+#### 连接集群
+
+
+
+
+
+
 

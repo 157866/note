@@ -2062,7 +2062,7 @@ springboot整合了redis才会有lettuce
   - 7614ae9453d1                                       redis镜像的版本号
   - --cluster-enabled yes                             开启redis集群
   - --appendonly yes                                   开启持久化
-  -  --privileged=true -v                               开启宿主机root权限
+  -  --privileged=true                                    开启宿主机root权限
   - -v                                                              容器卷
 
 ```
@@ -2101,6 +2101,7 @@ e5e7c2a80695   7614ae9453d1   "docker-entrypoint.s…"   19 seconds ago       Up
 - 解释
   - --cluster create ip:port  [ip:port...]                          创建主从关系
   - --cluster-replicas 1                                                     表示一个master搭建一个slave节点
+  - -a     123456                                                                 表示密码  本次配置没有采用配置文件 所有没有密码
 
 ```
 #先随机进入一个redis
@@ -2211,6 +2212,14 @@ df47 192.168.206.100:6383@16383 master - 0 1684568367750 3 connected 10923-16383
 
 36ab 192.168.206.100:6392@16392 slave 5689 0 1684568366745 2 connected      #从6392属于id=5689
 ```
+
+
+
+###### 查看一个key的槽位
+
+- 基础命令
+  - cluster    keyslot     keyName
+  - 查看这个key对应的槽位
 
 
 
@@ -2468,6 +2477,11 @@ a3ad 192.168.206.100:6393@16393 slave df47 0 1684642358000 3 connected
 如果之前的主机宕机了，那它的从机就会变成主机，如果之前的主机又起来了，只能是从机了，先来后到的原理
 
 
+
+###### 主从切换
+
+- 基本命令
+  - cluster failover    主从关系对换
 
 
 
