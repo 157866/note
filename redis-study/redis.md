@@ -1,5 +1,3 @@
-# Redis
-
 [TOC]
 
 
@@ -72,8 +70,8 @@ redis版本命名规则：
     - 查看版本4.8.5以上就可以了（包括4.8.5）
 
     ```
-  [root@hadoop100 ~]# gcc -v
-  gcc 版本 4.8.5 20150623 (Red Hat 4.8.5-44) (GCC)
+    [root@hadoop100 ~]# gcc -v
+    gcc 版本 4.8.5 20150623 (Red Hat 4.8.5-44) (GCC)
     ```
 
   - 如果没有gcc 环境安装
@@ -934,10 +932,10 @@ The `SET` command supports a set of options that modify its behavior:
     - APPEND		key             values                          追加在key中的value值里面
 
 		```
-127.0.0.1:6379> APPEND k1 sadawds
-(integer) 22
-127.0.0.1:6379> get k1
-"axxxxfg12345678 sadawds"
+    127.0.0.1:6379> APPEND k1 sadawds
+    (integer) 22
+    127.0.0.1:6379> get k1
+    "axxxxfg12345678 sadawds"
     ```
 ```
 
@@ -2008,7 +2006,7 @@ See the [complete list of sorted set commands](https://redis.io/commands/?group=
   - 实际操作
 
     ```
-  127.0.0.1:6379> zrange zset 0 -1
+    127.0.0.1:6379> zrange zset 0 -1
     1) "v1"
     2) "v2"
     3) "v4"
@@ -7230,9 +7228,256 @@ redis-cli -a 123456 -p 6400 --raw
 
 #### 连接集群
 
+- redis集群架构
+
+![image-20230520153221872](.\imgs\image-20230520153221872.png)
+
+>  集群情况  三主三从
+
+```
+127.0.0.1:6381> CLUSTER NODES
+05077ffab7bbb7a8a03c024c648ac092bbf75689 192.168.206.100:6382@16382 master - 0 1697950794691 11 connected 5461-10922
+56cbd2b7aa0ea2072113d6066f9671cdb23fdf47 192.168.206.100:6383@16383 master - 0 1697950796000 12 connected 10923-16383
+60ceebe6601db538a4ac64859b61d1c4abe6a3ad 192.168.206.100:6393@16393 slave 56cbd2b7aa0ea2072113d6066f9671cdb23fdf47 0 1697950796730 12 connected
+541bb98e6982632c573d12b543a91b39bd149336 192.168.206.100:6391@16391 slave 78ba1e5759efe34a26631a25b0a4400329651e80 0 1697950795000 10 connected
+78ba1e5759efe34a26631a25b0a4400329651e80 192.168.206.100:6381@16381 myself,master - 0 1697950791000 10 connected 0-5460
+105ceca39e8e16b2795f679d304ce5c02fb836ab 192.168.206.100:6392@16392 slave 05077ffab7bbb7a8a03c024c648ac092bbf75689 0 1697950795708 11 connected
+
+```
+
+
+
+redis集群和redis的单机的区别是只有配置文件的改动
+
+
+
+##### application配置
+
+```
+server.port=7777
+
+spring.application.name=springBootRedis
+
+
+#=============================log================
+logging.level.root=info
+logging.level.com.example.demo=info
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger- %msg%n
+logging.file.name=../src/main/resources/redisLog/redis_study.log
+logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger- %msg%n
+
+
+#============================swagger============================
+spring.swagger2.enabled=true
+
+#在springboot2.6.X结合swagger2.9. X会提示documentationPluginsBootstrapper空措针异常,
+#原因是在springboot2.6.X中将SpringMVC默认路径匹配策略从AntPathMatcher更改为PathPatternParser,
+#导致出错，解决办法是matching-strategy切换回之前ant_ path_ matcher
+
+spring.mvc.pathmatch.matching-strategy=ant_path_matcher
+
+#==============================redis 集群============================
+spring.redis.password=
+#获取失败 最大重定向次数
+spring.redis.cluster.max-redirects=3
+spring.redis.lettuce.pool.max-active=8
+spring.redis.lettuce.pool.max-wait=1ms
+spring.redis.lettuce.pool.max-idle=8
+spring.redis.lettuce.pool.min-idle=0
+spring.redis.cluster.nodes=192.168.206.100:6381,192.168.206.100:6382,192.168.206.100:6383,\
+  192.168.206.100:6391,192.168.206.100:6392,192.168.206.100:6393
+#支持集群拓扑动态感应刷新，自适应拓扑刷新是否使用所有可用的更新，默认false
+spring.redis.lettuce.cluster.refresh.adaptive=true
+#定时刷新
+spring.redis.lettuce.cluster.refresh.period=2000
+
+```
+
+
+
+##### 测试
+
+- -c			         以集群连接
+- --raw              支持中文连接
+-  -p                   端口号
+- -a                     密码 本次集群没有设置密码
+
+```
+root@hadoop100:/data# redis-cli -p 6381 -c --raw
+127.0.0.1:6381> get ord:607
+-> Redirected to slot [6035] located at 192.168.206.100:6382
+"pdd订单901b10e8-57a1-4f5e-86fe-3eb9836a10fb"
+192.168.206.100:6382> keys *
+ord:607
+```
+
+
+
+##### 故障演示
+
+Redis Cluster 集群部署采用了3主3从拓扑结构，数据读写访问master节点，salve节点负责备份。当master宕机主从却换成功，redis手动ok，but的经典2个bug
 
 
 
 
 
+模拟停掉一个master  本次停掉微服务为 6381
 
+```
+[root@hadoop100 ~]# docker ps
+CONTAINER ID   IMAGE          COMMAND                   CREATED        STATUS          PORTS     NAMES
+eb8c3de1a261   7614ae9453d1   "docker-entrypoint.s…"   5 months ago   Up 2 seconds              redis-node-6
+bf206c586328   7614ae9453d1   "docker-entrypoint.s…"   5 months ago   Up 2 seconds              redis-node-5
+098af405c246   7614ae9453d1   "docker-entrypoint.s…"   5 months ago   Up 3 seconds              redis-node-4
+e5e7c2a80695   7614ae9453d1   "docker-entrypoint.s…"   5 months ago   Up 13 seconds             redis-node-3
+0a6298a72e34   7614ae9453d1   "docker-entrypoint.s…"   5 months ago   Up 13 seconds             redis-node-2
+5041b6821468   7614ae9453d1   "docker-entrypoint.s…"   5 months ago   Up 13 seconds             redis-node-1
+
+[root@hadoop100 ~]# docker stop 5041b6821468
+5041b6821468
+```
+
+
+
+查看微服务状态  发现主从切换了也就是 手动ok
+
+```
+[root@hadoop100 ~]# docker exec -it redis-node-4 /bin/bash
+root@hadoop100:/data# redis-cli -c -p 6391 --raw
+127.0.0.1:6391> CLUSTER NODES
+05077ffab7bbb7a8a03c024c648ac092bbf75689 192.168.206.100:6382@16382 master - 0 1697953140000 11 connected 5461-10922
+541bb98e6982632c573d12b543a91b39bd149336 192.168.206.100:6391@16391 myself,master - 0 1697953137000 13 connected 0-5460
+56cbd2b7aa0ea2072113d6066f9671cdb23fdf47 192.168.206.100:6383@16383 master - 0 1697953142337 12 connected 10923-16383
+60ceebe6601db538a4ac64859b61d1c4abe6a3ad 192.168.206.100:6393@16393 slave 56cbd2b7aa0ea2072113d6066f9671cdb23fdf47 0 1697953141317 12 connected
+105ceca39e8e16b2795f679d304ce5c02fb836ab 192.168.206.100:6392@16392 slave 05077ffab7bbb7a8a03c024c648ac092bbf75689 0 1697953142000 11 connected
+78ba1e5759efe34a26631a25b0a4400329651e80 192.168.206.100:6381@16381 master,fail - 1697953088341 1697953084000 10 disconnected
+
+```
+
+
+
+
+
+###### 错误bug
+
+微服务的运行效果
+
+- Unable to connect to 192.168.206.100:6381] 停掉的服务器是 6381
+
+```
+2023-10-22 13:39:38.203 [http-nio-7777-exec-5] ERROR org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/].[dispatcherServlet]- Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is org.springframework.data.redis.RedisConnectionFailureException: Redis connection failed; nested exception is io.lettuce.core.RedisConnectionException: Unable to connect to 192.168.206.100:6381] with root cause
+java.net.ConnectException: Connection refused: no further information
+	at java.base/sun.nio.ch.SocketChannelImpl.checkConnect(Native Method)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:337)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:776)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:844)
+
+```
+
+
+
+###### bug原因
+
+SpringBoot 2.X 版本， Redis默认的连接采用lettuce 当Redis集群发生变化后，lettuce默认是不会刷新新节点拓扑
+
+
+
+
+
+###### 解决方案
+
+
+
+1. 排除lettuce采用jedis  不推荐
+2. 重写连接工厂实例       极度不推荐
+3. 刷新节点集群拓扑动态感知      官网  [Redis Cluster · lettuce-io/lettuce-core Wiki · GitHub](https://github.com/lettuce-io/lettuce-core/wiki/Redis-Cluster#execution-of-commands-on-one-or-multiple-cluster-nodes)
+
+官网解释
+
+```
+Refreshing the cluster topology view
+The Redis Cluster configuration may change at runtime. New nodes can be added, the master for a specific slot can change. Lettuce handles MOVED and ASK redirects transparently but in case too many commands run into redirects, you should refresh the cluster topology view. The topology is bound to a RedisClusterClient instance. All cluster connections that are created by one RedisClusterClient instance share the same cluster topology view. The view can be updated in three ways:
+
+Either by calling RedisClusterClient.reloadPartitions
+
+Periodic updates in the background based on an interval
+
+Adaptive updates in the background based on persistent disconnects and MOVED/ASK redirections
+
+By default, commands follow -ASK and -MOVED redirects up to 5 times until the command execution is considered to be failed. Background topology updating starts with the first connection obtained through RedisClusterClient.
+```
+
+> 翻译
+
+刷新集群拓扑视图
+
+Redis Cluster配置可能会在运行时更改。可以添加新节点，特定插槽的主节点可以更改。Lettuce透明地处理MOVED和ASK重定向，但如果重定向中遇到太多命令，您应该刷新集群拓扑视图。拓扑绑定到RedisClusterClient实例。由一个RedisClusterClient实例创建的所有集群连接共享相同的集群拓扑视图。可以通过三种方式更新视图：
+
+通过调用RedisClusterClient. reload分区
+
+基于间隔的后台定期更新
+
+基于持续断开连接和MOVED/ASK重定向的后台自适应更新
+
+默认情况下，命令跟随-ASK，-MOVED重定向最多5次，直到认为命令执行失败。后台拓扑更新从通过RedisClusterClient获得的第一个连接开始。
+
+
+
+修改application配置
+
+```
+#==============================redis 集群============================
+spring.redis.password=
+#获取失败 最大重定向次数
+spring.redis.cluster.max-redirects=3
+spring.redis.lettuce.pool.max-active=8
+spring.redis.lettuce.pool.max-wait=1ms
+spring.redis.lettuce.pool.max-idle=8
+spring.redis.lettuce.pool.min-idle=0
+spring.redis.cluster.nodes=192.168.206.100:6381,192.168.206.100:6382,192.168.206.100:6383,\
+  192.168.206.100:6391,192.168.206.100:6392,192.168.206.100:6393
+#支持集群拓扑动态感应刷新，自适应拓扑刷新是否使用所有可用的更新，默认false
+spring.redis.lettuce.cluster.refresh.adaptive=true
+#定时刷新
+spring.redis.lettuce.cluster.refresh.period=2000
+```
+
+
+
+
+
+再次测试 现报不能连接6381 然后故障迁移
+
+```
+WARN  io.lettuce.core.cluster.topology.DefaultClusterTopologyRefresh- Unable to connect to[192.168.206.100:6381]: Connection refused: no further information: /192.168.206.100:6381
+ INFO  com.example.demo.service.OrderService- key = ord:172 INFO  com.example.demo.service.OrderService- value = pdd订单54316306-0fa7-4b01-8d45-f7adc38f878d
+```
+
+
+
+查看redis数据
+
+```
+root@hadoop100:/data# redis-cli -c -p 6391 --raw
+127.0.0.1:6391> get ord:172
+-> Redirected to slot [6961] located at 192.168.206.100:6382
+"pdd订单54316306-0fa7-4b01-8d45-f7adc38f878d"
+192.168.206.100:6382> 
+
+```
+
+
+
+## Redis 高级篇
+
+
+
+技术要求： boot  cloud   docker nginx   juc   jmeter
